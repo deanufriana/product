@@ -3,7 +3,7 @@ import ip from "../config";
 export const ALL_PRODUCTS = () => {
   return {
     type: "ALL_PRODUCTS",
-    payload: axios.get(ip + "/products")
+    payload: axios.get(`${ip}/products`)
   };
 };
 

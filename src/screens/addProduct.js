@@ -2,33 +2,33 @@ import React, { Component } from "react";
 import {
   Container,
   Picker,
-  Content,
   Card,
   CardItem,
   Text,
   Body,
   View,
   Button,
-  Left,
   Right
 } from "native-base";
-import { TextInput } from "react-native-gesture-handler";
-import { FlatList } from "react-native";
+import { TextInput, ScrollView } from "react-native-gesture-handler";
 import { connect } from "react-redux";
 import { ALL_PRODUCTS, GET_PRODUCT } from "../redux/actions/product";
+import { ALL_SUPPLIERS } from "../redux/actions/supplier";
+import ip from "../redux/config";
 
 class addProduct extends Component {
   state = {
     supplier: undefined,
     productId: 1,
     carts: [],
-    products: {},
-    price: {},
-    qty: 0
+    qty: 0,
+    qtyProduct: 0,
+    totalProduct: 0
   };
 
   componentDidMount() {
     this.props.dispatch(ALL_PRODUCTS());
+    this.props.dispatch(ALL_SUPPLIERS());
   }
 
   onChangeSupplier(supplier) {
@@ -40,8 +40,24 @@ class addProduct extends Component {
     this.setState({ productId });
   }
 
-  onAddProduct() {
-    this.setState(prevState => ({
+  async onSaveTransaction() {
+    await axios
+      .post(`${ip}/purchaseOrder`, {
+        ...this.state.carts,
+        supplier_id: this.state.supplier,
+        totals: this.state.totalProduct,
+        qty: this.state.qty
+      })
+      .then(response => {
+        console.warn(response);
+      })
+      .catch(response => {
+        console.warn(response);
+      });
+  }
+
+  async onAddProduct() {
+    await this.setState(prevState => ({
       carts: [
         ...prevState.carts,
         {
@@ -52,30 +68,60 @@ class addProduct extends Component {
         }
       ]
     }));
+
+    const totalProduct = this.state.carts.reduce((acc, currValue) => {
+      return acc + currValue.total;
+    }, 0);
+
+    const qtyProduct = this.state.carts.reduce((acc, currValue) => {
+      return parseInt(acc + currValue.qty);
+    }, 0);
+
+    this.setState({ totalProduct, qtyProduct });
   }
 
-  onDeleteProduct(index) {
-    this.setState(prevState => ({
+  async onDeleteProduct(index) {
+    await this.setState(prevState => ({
       carts: prevState.carts.filter((product, i) => {
         return i !== index;
       })
     }));
+
+    const totalProduct = this.state.carts.reduce((acc, currValue) => {
+      return acc + currValue.total;
+    }, 0);
+
+    const qtyProduct = this.state.carts.reduce((acc, currValue) => {
+      return parseInt(acc + currValue.qty);
+    }, 0);
+
+    this.setState({ totalProduct, qtyProduct });
   }
 
   render() {
     return (
       <Container>
-        <Content>
-          <View style={{ margin: 10 }}>
+        <View style={{ margin: 10, flex: 1 }}>
+          <View>
+            <Text note> Select Supplier </Text>
             <Picker
               mode="dialog"
               selectedValue={this.state.supplier}
               onValueChange={supplier => this.onChangeSupplier(supplier)}
             >
-              <Picker.Item label="Sup1" value="1" />
-              <Picker.Item label="Sup2" value="2" />
+              <Picker.Item label="Select" />
+              {this.props.suppliers.isLoading ? (
+                <Picker.Item label="Loading" />
+              ) : (
+                this.props.suppliers.results.map((item, key) => {
+                  return (
+                    <Picker.Item key={key} label={item.name} value={item.id} />
+                  );
+                })
+              )}
             </Picker>
-
+          </View>
+          <ScrollView style={{ flex: 1 }}>
             {this.state.carts.map((data, key) => {
               return (
                 <Card key={key}>
@@ -102,61 +148,62 @@ class addProduct extends Component {
                 </Card>
               );
             })}
-            <View style={{ flexDirection: "row" }}>
-              <Picker
-                style={{ flex: 1 }}
-                selectedValue={this.state.productId}
-                onValueChange={productId => this.onChangeProduct(productId)}
-              >
-                {this.props.products.isLoading ? (
-                  <Picker.Item label="Loading" />
-                ) : (
-                  this.props.products.results.map((item, key) => {
-                    return (
-                      <Picker.Item
-                        label={item.name}
-                        value={item.id}
-                        key={key}
-                      />
-                    );
-                  })
-                  //   <FlatList
-                  //     data={this.props.products.results}
-                  //     renderItem={item => {
-                  //      ;
-                  //     }}
-                  //   />
-                )}
-              </Picker>
-              <TextInput
-                placeholder="QTY"
-                onChangeText={qty => this.setState({ qty })}
-              />
-              <Button
-                small
-                style={{ alignSelf: "center", marginLeft: 5 }}
-                onPress={() => this.onAddProduct()}
-              >
-                <Text>Add</Text>
-              </Button>
-            </View>
-            <View style={{ flexDirection: "row", marginTop: 10 }}>
-              <Button small style={{ flex: 1 }}>
-                <Text>Simpan</Text>
-              </Button>
-              <Button small full danger>
-                <Text>Batal</Text>
-              </Button>
-            </View>
+          </ScrollView>
+
+          <View style={{ flexDirection: "row" }}>
+            <Picker
+              style={{ flex: 1 }}
+              selectedValue={this.state.productId}
+              onValueChange={productId => this.onChangeProduct(productId)}
+            >
+              {this.props.products.isLoading ? (
+                <Picker.Item label="Loading" />
+              ) : (
+                this.props.products.results.map((item, key) => {
+                  return (
+                    <Picker.Item label={item.name} value={item.id} key={key} />
+                  );
+                })
+              )}
+            </Picker>
+            <TextInput
+              keyboardType="numeric"
+              placeholder="QTY"
+              onChangeText={qty => this.setState({ qty })}
+            />
+            <Button
+              small
+              style={{ alignSelf: "center", marginLeft: 5 }}
+              onPress={() => this.onAddProduct()}
+            >
+              <Text>Add</Text>
+            </Button>
           </View>
-        </Content>
+          <View style={{ flexDirection: "row", marginTop: 10 }}>
+            <Text style={{ flex: 1 }}>Total</Text>
+            <Text>{this.state.totalProduct}</Text>
+          </View>
+          <View style={{ flexDirection: "row", marginTop: 10 }}>
+            <Text style={{ flex: 1 }}>QTY</Text>
+            <Text>{this.state.qtyProduct}</Text>
+          </View>
+          <View style={{ flexDirection: "row", marginTop: 10 }}>
+            <Button small style={{ flex: 1 }}>
+              <Text>Simpan</Text>
+            </Button>
+            <Button small full danger>
+              <Text>Batal</Text>
+            </Button>
+          </View>
+        </View>
       </Container>
     );
   }
 }
 const mapStateToPros = state => ({
   products: state.productsReducers,
-  product: state.productReducers
+  product: state.productReducers,
+  suppliers: state.suppliersReducers
 });
 
 export default connect(mapStateToPros)(addProduct);
